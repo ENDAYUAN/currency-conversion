@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>金额智能换算</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>金额智能换算工具箱</h1>
+            <p>中文大写 • 实时汇率 • 智能识别</p>
+        </header>
+
+        <!-- 模块0：智能识别转换 -->
+        <section class="card highlight-card">
+            <h2>智能识别转换</h2>
+            <div class="smart-grid">
+                <!-- 第一行：输入 数字 + 单位 + 币种 -->
+                <div class="smart-row">
+                    <input type="text" id="smart-input" placeholder="输入金额" autocomplete="off">
+                    <select id="smart-unit">
+                        <option value="1">无单位</option>
+                        <option value="100">百</option>
+                        <option value="1000">千</option>
+                        <option value="10000">万</option>
+                        <option value="100000000">亿</option>
+                    </select>
+                    <select id="smart-source-currency">
+                        <option value="CNY">CNY - 人民币</option>
+                        <option value="USD">USD - 美元</option>
+                        <option value="EUR">EUR - 欧元</option>
+                        <option value="RUB">RUB - 俄币(卢布)</option>
+                        <option value="GBP">GBP - 英镑</option>
+                        <option value="JPY">JPY - 日元</option>
+                        <option value="HKD">HKD - 港币</option>
+                    </select>
+                </div>
+                
+                <!-- 第二行：结果 数字 + 单位 + 币种 -->
+                <div class="smart-row">
+                    <div id="smart-main-result" class="result-display">--</div>
+                    <select id="smart-target-unit">
+                        <option value="1">无单位</option>
+                        <option value="100">百</option>
+                        <option value="1000">千</option>
+                        <option value="10000">万</option>
+                        <option value="100000000">亿</option>
+                    </select>
+                    <select id="smart-target">
+                        <option value="CNY">CNY - 人民币</option>
+                        <option value="USD">USD - 美元</option>
+                        <option value="EUR">EUR - 欧元</option>
+                        <option value="RUB">RUB - 俄币(卢布)</option>
+                        <option value="GBP">GBP - 英镑</option>
+                        <option value="JPY">JPY - 日元</option>
+                        <option value="HKD">HKD - 港币</option>
+                    </select>
+                </div>
+
+                <!-- 新增：标准读法显示 -->
+                <div class="smart-reading">
+                    <div class="reading-header">标准读法与汇率</div>
+                    <div id="smart-source-reading" class="reading-text"><span style="color:#94a3b8">等待输入...</span></div>
+                    <div class="reading-divider"></div>
+                    <div id="smart-target-reading" class="reading-text"><span style="color:#94a3b8">等待输入...</span></div>
+                    <div class="reading-divider"></div>
+                    <div id="smart-rate-display" class="reading-text" style="color:var(--primary-color); font-size: 0.9rem;">
+                        <span style="color:#64748b">当前汇率：</span>--
+                    </div>
+                </div>
+                
+                <div class="smart-sub" id="smart-sub-result" style="display:none;"></div>
+            </div>
+        </section>
+
+        <!-- 模块1：中文大写金额 -->
+        <section class="card">
+            <h2>中文大写金额</h2>
+            <div class="input-group">
+                <label for="amount-cn">输入金额 (CNY)</label>
+                <input type="number" id="amount-cn" placeholder="例如：12345.67" step="0.01">
+            </div>
+            <div class="result-box" id="result-cn">
+                <span class="placeholder">等待输入...</span>
+            </div>
+            <button class="copy-btn" id="copy-cn">复制大写</button>
+        </section>
+
+        <!-- 模块2：货币换算 -->
+        <section class="card">
+            <div class="card-header">
+                <h2>货币实时换算</h2>
+                <button id="refresh-rate" title="刷新汇率">↻ 刷新</button>
+            </div>
+            <div class="converter-grid">
+                <div class="input-group">
+                    <label>持有金额</label>
+                    <input type="number" id="amount-ex" value="100" placeholder="0.00">
+                </div>
+                <div class="input-group">
+                    <label>持有币种</label>
+                    <select id="currency-from">
+                        <option value="CNY" selected>CNY - 人民币</option>
+                        <option value="USD">USD - 美元</option>
+                        <option value="EUR">EUR - 欧元</option>
+                        <option value="GBP">GBP - 英镑</option>
+                        <option value="JPY">JPY - 日元</option>
+                        <option value="HKD">HKD - 港币</option>
+                    </select>
+                </div>
+                <div class="exchange-icon">⇄</div>
+                <div class="input-group">
+                    <label>目标币种</label>
+                    <select id="currency-to">
+                        <option value="USD" selected>USD - 美元</option>
+                        <option value="CNY">CNY - 人民币</option>
+                        <option value="EUR">EUR - 欧元</option>
+                        <option value="GBP">GBP - 英镑</option>
+                        <option value="JPY">JPY - 日元</option>
+                        <option value="HKD">HKD - 港币</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>换算结果</label>
+                    <input type="text" id="amount-result" readonly placeholder="0.00">
+                </div>
+            </div>
+            <div class="rate-info">
+                当前汇率: 1 <span id="rate-from">CNY</span> = <span id="rate-val">--</span> <span id="rate-to">USD</span>
+                <br>
+                <small id="update-time">更新时间: --</small>
+            </div>
+            <button class="action-btn" id="save-record">保存记录</button>
+        </section>
+
+        <!-- 模块3：历史记录 -->
+        <section class="card">
+            <div class="card-header">
+                <h2>历史记录</h2>
+                <button class="clear-btn" id="clear-history">清空</button>
+            </div>
+            <ul class="history-list" id="history-list">
+                <!-- 历史记录项由 JS 生成 -->
+                <li class="empty-tip">暂无记录</li>
+            </ul>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
