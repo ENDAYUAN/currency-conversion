@@ -72,6 +72,11 @@
                 </div>
                 
                 <div class="smart-sub" id="smart-sub-result" style="display:none;"></div>
+                
+                <!-- 新增：保存记录按钮 -->
+                <div class="save-record-container">
+                    <button id="save-smart-record" class="save-btn">保存记录</button>
+                </div>
             </div>
         </section>
 
@@ -88,51 +93,37 @@
             <button class="copy-btn" id="copy-cn">复制大写</button>
         </section>
 
-        <!-- 模块2：货币换算 -->
+        <!-- 模块2：各国汇率浮动表 -->
         <section class="card">
             <div class="card-header">
-                <h2>货币实时换算</h2>
-                <button id="refresh-rate" title="刷新汇率">↻ 刷新</button>
-            </div>
-            <div class="converter-grid">
-                <div class="input-group">
-                    <label>持有金额</label>
-                    <input type="number" id="amount-ex" value="100" placeholder="0.00">
-                </div>
-                <div class="input-group">
-                    <label>持有币种</label>
-                    <select id="currency-from">
-                        <option value="CNY" selected>CNY - 人民币</option>
-                        <option value="USD">USD - 美元</option>
-                        <option value="EUR">EUR - 欧元</option>
-                        <option value="GBP">GBP - 英镑</option>
-                        <option value="JPY">JPY - 日元</option>
-                        <option value="HKD">HKD - 港币</option>
-                    </select>
-                </div>
-                <div class="exchange-icon">⇄</div>
-                <div class="input-group">
-                    <label>目标币种</label>
-                    <select id="currency-to">
-                        <option value="USD" selected>USD - 美元</option>
-                        <option value="CNY">CNY - 人民币</option>
-                        <option value="EUR">EUR - 欧元</option>
-                        <option value="GBP">GBP - 英镑</option>
-                        <option value="JPY">JPY - 日元</option>
-                        <option value="HKD">HKD - 港币</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label>换算结果</label>
-                    <input type="text" id="amount-result" readonly placeholder="0.00">
+                <h2>各国汇率浮动表</h2>
+                <div class="header-controls" style="display: flex; gap: 10px; align-items: center;">
+                     <select id="base-currency-select" style="width: auto; padding: 6px 10px; font-size: 0.9rem;">
+                        <option value="CNY">基准：CNY 人民币</option>
+                        <option value="USD">基准：USD 美元</option>
+                        <option value="EUR">基准：EUR 欧元</option>
+                        <option value="GBP">基准：GBP 英镑</option>
+                     </select>
+                     <button id="refresh-table-btn" title="刷新汇率" style="padding: 6px 12px;">↻ 刷新</button>
                 </div>
             </div>
-            <div class="rate-info">
-                当前汇率: 1 <span id="rate-from">CNY</span> = <span id="rate-val">--</span> <span id="rate-to">USD</span>
-                <br>
-                <small id="update-time">更新时间: --</small>
+            <div class="table-container">
+                <table class="rate-table">
+                    <thead>
+                        <tr>
+                            <th>币种</th>
+                            <th>汇率 (1 基准币)</th>
+                            <th>换算 (100 基准币)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rate-table-body">
+                        <tr><td colspan="3" style="text-align:center; padding: 20px;">数据加载中...</td></tr>
+                    </tbody>
+                </table>
             </div>
-            <button class="action-btn" id="save-record">保存记录</button>
+            <div class="rate-info" style="text-align: right; margin-top: 10px;">
+                <small id="table-update-time">更新时间: --</small>
+            </div>
         </section>
 
         <!-- 模块3：历史记录 -->

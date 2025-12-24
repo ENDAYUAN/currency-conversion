@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     initChineseConverter();
-    initCurrencyConverter();
+    initExchangeRateTable();
     initHistory();
     initSmartConverter();
 });
@@ -74,6 +74,14 @@ function initSmartConverter() {
         processSmartInput();
     };
 
+    // 添加保存记录功能
+    const saveBtn = document.getElementById('save-smart-record');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            saveSmartRecord();
+        });
+    }
+
     input.addEventListener('keyup', (e) => {
         if (e.key === 'Enter') handleInput();
     });
@@ -90,6 +98,53 @@ function initSmartConverter() {
     if (sourceSelect) sourceSelect.addEventListener('change', handleInput);
     if (targetSelect) targetSelect.addEventListener('change', handleInput);
     if (targetUnitSelect) targetUnitSelect.addEventListener('change', handleInput);
+
+    // 保存当前智能转换记录到历史
+    function saveSmartRecord() {
+        const text = input.value.trim();
+        if (!text || mainResult.textContent === '--' || mainResult.textContent === '无法识别') {
+            alert('请先输入有效内容并完成转换');
+            return;
+        }
+
+        // 获取当前源和目标信息
+        const sourceCurrency = sourceSelect.value;
+        const targetCurrency = targetSelect.value;
+        const unitMultiplier = parseFloat(unitSelect.value) || 1;
+        const targetMultiplier = parseFloat(targetUnitSelect.value) || 1;
+        
+        // 解析输入数据
+        const parsed = parseInput(text);
+        if (!parsed) return;
+        
+        // 计算最终金额
+        const finalSourceAmount = parsed.amount * unitMultiplier;
+        
+        // 获取结果金额
+        const resultText = mainResult.textContent;
+        const resultNumber = parseFloat(resultText.replace(/,/g, ''));
+        const finalResultAmount = resultNumber * targetMultiplier;
+        
+        // 创建记录对象
+        const record = {
+            amount: finalSourceAmount,
+            from: sourceCurrency,
+            to: targetCurrency,
+            result: formatCurrency(finalResultAmount, targetCurrency),
+            timestamp: Date.now()
+        };
+        
+        // 保存到历史记录
+        addHistory(record);
+        
+        // 显示保存成功提示
+        const saveBtn = document.getElementById('save-smart-record');
+        if (saveBtn) {
+            const originalText = saveBtn.textContent;
+            saveBtn.textContent = '已保存！';
+            setTimeout(() => saveBtn.textContent = originalText, 1500);
+        }
+    }
 
     async function processSmartInput() {
         const text = input.value.trim();
@@ -398,99 +453,124 @@ function digitToChinese(n) {
 }
 
 // ==========================================
-// 模块2：货币换算
+// 模块2：各国汇率浮动表
 // ==========================================
-function initCurrencyConverter() {
-    const amountInput = document.getElementById('amount-ex');
-    const fromSelect = document.getElementById('currency-from');
-    const toSelect = document.getElementById('currency-to');
-    const resultInput = document.getElementById('amount-result');
-    const refreshBtn = document.getElementById('refresh-rate');
-    const saveBtn = document.getElementById('save-record');
+function initExchangeRateTable() {
+    const baseSelect = document.getElementById('base-currency-select');
+    const refreshBtn = document.getElementById('refresh-table-btn');
+    const tableBody = document.getElementById('rate-table-body');
+    const updateTimeEl = document.getElementById('table-update-time');
 
-    // 初始化加载汇率
-    fetchGlobalRates(fromSelect.value).then(updateCalculation);
+    const CURRENCY_CONFIG = {
+        "CNY": { name: "人民币", flag: "🇨🇳" },
+        "USD": { name: "美元", flag: "🇺🇸" },
+        "EUR": { name: "欧元", flag: "🇪🇺" },
+        "GBP": { name: "英镑", flag: "🇬🇧" },
+        "JPY": { name: "日元", flag: "🇯🇵" },
+        "HKD": { name: "港币", flag: "🇭🇰" },
+        "RUB": { name: "卢布", flag: "🇷🇺" },
+        "KRW": { name: "韩元", flag: "🇰🇷" },
+        "AUD": { name: "澳元", flag: "🇦🇺" },
+        "CAD": { name: "加元", flag: "🇨🇦" },
+        "SGD": { name: "新加坡元", flag: "🇸🇬" },
+        "THB": { name: "泰铢", flag: "🇹🇭" }
+    };
+    
+    const DISPLAY_LIST = Object.keys(CURRENCY_CONFIG);
 
-    function updateCalculation() {
-        const amount = parseFloat(amountInput.value);
-        const from = fromSelect.value;
-        const to = toSelect.value;
+    // 初始化加载
+    loadData();
+
+    async function loadData() {
+        const base = baseSelect.value;
+        setLoadingState(true);
         
-        if (isNaN(amount)) {
-            resultInput.value = '';
-            return;
+        // 尝试获取数据
+        const success = await fetchGlobalRates(base);
+        
+        if (success) {
+            renderTable();
+        } else {
+            // 如果获取失败
+            if (currentBase !== base) {
+                // 如果切换币种失败，回退下拉框显示
+                alert(`获取 ${base} 汇率失败，请检查网络。`);
+                baseSelect.value = currentBase;
+                renderTable();
+            } else {
+                // 如果是当前币种刷新失败（可能使用了缓存或兜底），依然渲染
+                renderTable();
+            }
+        }
+        
+        setLoadingState(false);
+    }
+
+    function renderTable() {
+        const base = baseSelect.value;
+        tableBody.innerHTML = '';
+        
+        // 更新时间显示
+        if (lastUpdateTime && updateTimeEl) {
+            updateTimeEl.textContent = '更新时间: ' + lastUpdateTime.toLocaleString();
         }
 
-        // 使用 fetchGlobalRates 后的全局 currentRates 计算
-        // currentRates 是基于 currentBase 的
-        
-        // 我们需要 Result = Amount * Rate(From -> To)
-        // Rate(From -> To) = Rate(Base -> To) / Rate(Base -> From)
-        
-        let rateFrom = currentRates[from];
-        let rateTo = currentRates[to];
-        
-        // 安全检查
-        if (currentBase === from) rateFrom = 1;
-        if (currentBase === to) rateTo = 1;
-        
-        if (rateFrom && rateTo) {
-            const result = (amount / rateFrom) * rateTo;
-            resultInput.value = formatCurrency(result, to);
+        DISPLAY_LIST.forEach(code => {
+            if (code === base) return; // 不显示基准货币自己
+
+            const rate = currentRates[code];
+            if (!rate) return;
+
+            const tr = document.createElement('tr');
             
-            // 计算直接汇率用于显示: 1 From = ? To
-            const displayRate = (1 / rateFrom) * rateTo;
-            updateRateInfo(from, to, displayRate);
+            // 币种列
+            const config = CURRENCY_CONFIG[code] || { name: code, flag: '🌐' };
+            const cellCurrency = `
+                <div class="currency-cell">
+                    <span class="flag-icon">${config.flag}</span>
+                    <div>
+                        <div>${code}</div>
+                        <div class="currency-name">${config.name}</div>
+                    </div>
+                </div>
+            `;
+
+            // 汇率列 (1 Base = ? Target)
+            const cellRate = `<div class="rate-value">${rate.toFixed(4)}</div>`;
+
+            // 换算列 (100 Base = ? Target)
+            const amount100 = (rate * 100).toFixed(2);
+            const cellAmount = `<div class="rate-value">${amount100}</div>`;
+
+            tr.innerHTML = `
+                <td>${cellCurrency}</td>
+                <td>${cellRate}</td>
+                <td>${cellAmount}</td>
+            `;
+            
+            tableBody.appendChild(tr);
+        });
+    }
+
+    function setLoadingState(loading) {
+        if (loading) {
+            refreshBtn.textContent = '...';
+            refreshBtn.disabled = true;
+            tableBody.style.opacity = '0.5';
+        } else {
+            refreshBtn.textContent = '↻ 刷新';
+            refreshBtn.disabled = false;
+            tableBody.style.opacity = '1';
         }
     }
 
     // 事件监听
-    [amountInput, fromSelect, toSelect].forEach(el => {
-        el.addEventListener('input', updateCalculation);
-        el.addEventListener('change', updateCalculation);
-    });
-
-    fromSelect.addEventListener('change', async (e) => {
-        // 当源币种改变时，为了精度，建议切换 Base
-        // 但为了性能，可以先用现有数据算，用户点刷新再切
-        // 这里我们选择：尝试切换 Base，确保数据最新最准
-        await fetchGlobalRates(e.target.value);
-        updateCalculation();
-    });
-
-    refreshBtn.addEventListener('click', async () => {
-        // 强制刷新：这里通过清空 lastUpdateTime 或直接调用 fetch
-        lastUpdateTime = null; 
-        await fetchGlobalRates(fromSelect.value);
-        updateCalculation();
-    });
-
-    saveBtn.addEventListener('click', () => {
-        const amount = parseFloat(amountInput.value);
-        const from = fromSelect.value;
-        const to = toSelect.value;
-        const result = resultInput.value;
-
-        if (isNaN(amount) || !result) return;
-
-        addHistory({
-            amount,
-            from,
-            to,
-            result,
-            timestamp: new Date().toISOString()
-        });
-    });
-}
-
-function updateRateInfo(from, to, rate) {
-    const elFrom = document.getElementById('rate-from');
-    const elTo = document.getElementById('rate-to');
-    const elVal = document.getElementById('rate-val');
+    if (baseSelect) baseSelect.addEventListener('change', loadData);
     
-    if (elFrom) elFrom.textContent = from;
-    if (elTo) elTo.textContent = to;
-    if (elVal) elVal.textContent = rate.toFixed(4);
+    if (refreshBtn) refreshBtn.addEventListener('click', async () => {
+        lastUpdateTime = null; // Force refresh
+        await loadData();
+    });
 }
 
 function formatCurrency(num, currency) {

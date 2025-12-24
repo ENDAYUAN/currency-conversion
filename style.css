@@ -257,51 +257,58 @@ button {
     background-color: #e5e7eb;
 }
 
-/* 汇率模块 */
-.converter-grid {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 16px;
-    align-items: center;
+/* 汇率浮动表模块 */
+.table-container {
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-top: 10px;
 }
 
-.exchange-icon {
-    text-align: center;
-    font-size: 1.5rem;
-    color: var(--text-sub);
-    padding-top: 18px; /* Align with inputs */
-}
-
-#refresh-rate {
-    background: transparent;
-    color: var(--primary-color);
-    padding: 4px 8px;
-}
-
-#refresh-rate:hover {
-    background: #eff6ff;
-}
-
-.rate-info {
-    text-align: center;
-    font-size: 0.875rem;
-    color: var(--text-sub);
-    margin: 16px 0;
-    padding: 8px;
-    background: #f9fafb;
-    border-radius: 6px;
-}
-
-.action-btn {
+.rate-table {
     width: 100%;
-    background-color: var(--primary-color);
-    color: white;
-    padding: 12px;
-    font-size: 1rem;
+    border-collapse: collapse;
+    font-size: 0.95rem;
 }
 
-.action-btn:hover {
-    background-color: var(--primary-hover);
+.rate-table th, .rate-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.rate-table th {
+    background-color: #f8fafc;
+    font-weight: 600;
+    color: var(--text-sub);
+    white-space: nowrap;
+}
+
+.rate-table tr:last-child td {
+    border-bottom: none;
+}
+
+.rate-table tr:hover {
+    background-color: #f9fafb;
+}
+
+.currency-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: var(--text-main);
+}
+
+.currency-name {
+    color: var(--text-sub);
+    font-size: 0.85em;
+    font-weight: normal;
+}
+
+.rate-value {
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-weight: 500;
 }
 
 /* 历史记录 */
@@ -352,6 +359,26 @@ button {
 
 .clear-btn:hover {
     background: #fef2f2;
+}
+
+/* 保存记录按钮样式 */
+.save-record-container {
+    margin-top: 16px;
+    display: flex;
+    justify-content: center;
+}
+
+.save-btn {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 10px 24px;
+    font-size: 0.95rem;
+}
+
+.save-btn:hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
 }
 
 .empty-tip {
