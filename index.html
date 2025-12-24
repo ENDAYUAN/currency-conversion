@@ -80,6 +80,61 @@
             </div>
         </section>
 
+        <!-- 新增：模块4：股票持仓成本计算 -->
+        <section class="card">
+            <h2>股票持仓成本计算</h2>
+            <div class="stock-calculator-grid">
+                <!-- 输入区域 -->
+                <div class="stock-input-group">
+                    <label for="current-shares">持仓股数</label>
+                    <input type="number" id="current-shares" placeholder="请输入持仓股数" step="1" min="0">
+                </div>
+                
+                <div class="stock-input-group">
+                    <label for="current-cost">持仓成本价 (元)</label>
+                    <input type="number" id="current-cost" placeholder="请输入当前成本价" step="0.01" min="0">
+                </div>
+                
+                <div class="stock-input-group">
+                    <label for="change-shares">增减股数</label>
+                    <input type="number" id="change-shares" placeholder="正数为加仓，负数为减仓" step="1">
+                </div>
+                
+                <div class="stock-input-group">
+                    <label for="change-price">加减仓股价 (元)</label>
+                    <input type="number" id="change-price" placeholder="请输入加减仓股价" step="0.01" min="0">
+                </div>
+            </div>
+            
+            <!-- 计算按钮 -->
+            <div class="stock-calculate-container">
+                <button id="calculate-stock" class="calculate-btn">计算持仓成本</button>
+            </div>
+            
+            <!-- 结果显示区域 -->
+            <div class="stock-result-container">
+                <div class="stock-result-group">
+                    <label>最终持仓股数</label>
+                    <div id="final-shares" class="stock-result">--</div>
+                </div>
+                
+                <div class="stock-result-group">
+                    <label>最终持仓成本价 (元)</label>
+                    <div id="final-cost" class="stock-result">--</div>
+                </div>
+                
+                <div class="stock-result-group">
+                    <label>最后持仓总额 (元)</label>
+                    <div id="final-total" class="stock-result">--</div>
+                </div>
+                
+                <div class="stock-result-group">
+                    <label>最终盈亏 (元)</label>
+                    <div id="final-profit" class="stock-result">--</div>
+                </div>
+            </div>
+        </section>
+
         <!-- 模块1：中文大写金额 -->
         <section class="card">
             <h2>中文大写金额</h2>
@@ -138,6 +193,20 @@
             </ul>
         </section>
     </div>
+    
+    <!-- 访问统计区域 -->
+    <footer class="visitor-stats">
+        <div class="stats-container">
+            <div class="stat-item">
+                <span class="stat-label">访问人数：</span>
+                <span class="stat-value" id="visitor-count">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">浏览数：</span>
+                <span class="stat-value" id="view-count">0</span>
+            </div>
+        </div>
+    </footer>
 
     <script src="script.js"></script>
 </body>

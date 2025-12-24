@@ -3,7 +3,49 @@ document.addEventListener('DOMContentLoaded', () => {
     initExchangeRateTable();
     initHistory();
     initSmartConverter();
+    initStockCalculator(); // 初始化股票持仓成本计算器
+    initVisitorStats(); // 初始化访问统计
 });
+
+// ==========================================
+// 访问统计功能
+// ==========================================
+function initVisitorStats() {
+    const visitorCountEl = document.getElementById('visitor-count');
+    const viewCountEl = document.getElementById('view-count');
+    
+    if (!visitorCountEl || !viewCountEl) return;
+    
+    // 从localStorage获取统计数据
+    let stats = localStorage.getItem('visitorStats');
+    
+    if (!stats) {
+        // 首次访问，初始化统计数据
+        stats = {
+            visitorCount: 1,
+            viewCount: 1,
+            lastVisitDate: new Date().toDateString()
+        };
+    } else {
+        stats = JSON.parse(stats);
+        // 更新浏览数
+        stats.viewCount++;
+        
+        // 检查是否为新访问者（不同日期或首次访问）
+        const today = new Date().toDateString();
+        if (stats.lastVisitDate !== today) {
+            stats.visitorCount++;
+            stats.lastVisitDate = today;
+        }
+    }
+    
+    // 保存更新后的统计数据
+    localStorage.setItem('visitorStats', JSON.stringify(stats));
+    
+    // 更新页面显示
+    visitorCountEl.textContent = stats.visitorCount;
+    viewCountEl.textContent = stats.viewCount;
+}
 
 // ==========================================
 // 全局汇率状态
@@ -18,40 +60,43 @@ const FALLBACK_RATES = {
     "RUB": 13.5
 };
 
-let currentRates = { ...FALLBACK_RATES };
+let currentRates = Object.assign({}, FALLBACK_RATES);
 let lastUpdateTime = null;
 let currentBase = 'CNY';
 
 // 全局汇率获取函数
-async function fetchGlobalRates(base) {
+function fetchGlobalRates(base) {
     // 如果已经有缓存且 base 相同且时间在 1 小时内，直接返回
     if (base === currentBase && lastUpdateTime && (new Date() - lastUpdateTime < 3600000)) {
-        return true;
+        return Promise.resolve(true);
     }
 
-    try {
-        const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${base}`);
-        if (!response.ok) throw new Error('Network response was not ok');
-        const data = await response.json();
-        currentRates = data.rates;
-        lastUpdateTime = new Date(data.time_last_updated * 1000);
-        currentBase = base;
-        
-        // 更新页面上的汇率时间（如果在汇率模块）
-        const updateTimeEl = document.getElementById('update-time');
-        if (updateTimeEl) {
-            updateTimeEl.textContent = '更新时间: ' + lastUpdateTime.toLocaleString();
-        }
-        return true;
-    } catch (error) {
-        console.warn('API调用失败，使用兜底汇率', error);
-        // 如果失败，回退到默认
-        if (base === 'CNY') {
-            currentRates = { ...FALLBACK_RATES };
-            currentBase = 'CNY';
-        }
-        return false;
-    }
+    return fetch(`https://api.exchangerate-api.com/v4/latest/${base}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            currentRates = data.rates;
+            lastUpdateTime = new Date(data.time_last_updated * 1000);
+            currentBase = base;
+            
+            // 更新页面上的汇率时间（如果在汇率模块）
+            const updateTimeEl = document.getElementById('update-time');
+            if (updateTimeEl) {
+                updateTimeEl.textContent = '更新时间: ' + lastUpdateTime.toLocaleString();
+            }
+            return true;
+        })
+        .catch(error => {
+            console.warn('API调用失败，使用兜底汇率', error);
+            // 如果失败，回退到默认
+            if (base === 'CNY') {
+                currentRates = Object.assign({}, FALLBACK_RATES);
+                currentBase = 'CNY';
+            }
+            return false;
+        });
 }
 
 // ==========================================
@@ -146,7 +191,7 @@ function initSmartConverter() {
         }
     }
 
-    async function processSmartInput() {
+    function processSmartInput() {
         const text = input.value.trim();
         if (!text) {
             mainResult.textContent = '--';
@@ -214,94 +259,102 @@ function initSmartConverter() {
         if (currentBase === sourceCurrency) rateSource = 1;
         
         if (!rateSource || !rateTarget) {
-            await fetchGlobalRates('CNY');
-            rateSource = currentRates[sourceCurrency];
-            rateTarget = currentRates[targetCurrency];
+            // 如果没有汇率数据，获取新的汇率
+            fetchGlobalRates('CNY').then(() => {
+                rateSource = currentRates[sourceCurrency];
+                rateTarget = currentRates[targetCurrency];
+                displayResult();
+            });
+        } else {
+            // 如果有汇率数据，直接显示结果
+            displayResult();
         }
         
-        if (rateSource && rateTarget) {
-            const baseResult = (finalSourceAmount / rateSource) * rateTarget;
-            const finalResult = baseResult / targetMultiplier;
-            
-            // 显示结果
-            if (targetMultiplier > 1) {
-                mainResult.textContent = new Intl.NumberFormat('zh-CN', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 4 
-                }).format(finalResult);
-            } else {
-                mainResult.textContent = formatCurrency(finalResult, targetCurrency);
-            }
-            
-            // 只有当目标单位和源单位不一样，或者有倍率时，才显示辅助信息，否则太冗余
-            let targetUnitText = '';
-             if (targetMultiplier > 1 && targetUnitSelect) {
-                targetUnitText = targetUnitSelect.options[targetUnitSelect.selectedIndex].text;
-            }
-            subResult.textContent += ` -> ${mainResult.textContent} ${targetUnitText}${targetCurrency}`;
-            
-            // 显示汇率参考
-            const exchangeRate = rateTarget / rateSource;
-            // 为了符合用户习惯，如果数值小于1 (如 CNY->USD = 0.14)，则显示反向汇率 (1 USD = 7.x CNY)
-            let rateText = '';
-            if (exchangeRate < 1 && exchangeRate > 0) {
-                 rateText = `1 ${targetCurrency} ≈ ${(1/exchangeRate).toFixed(4)} ${sourceCurrency}`;
-                 subResult.textContent += `  (${rateText})`;
-            } else {
-                 rateText = `1 ${sourceCurrency} ≈ ${exchangeRate.toFixed(4)} ${targetCurrency}`;
-                 subResult.textContent += `  (${rateText})`;
-            }
-
-            // 新增：显示标准读法
-            if (readingBox && sourceReadingEl && targetReadingEl) {
-                const getCurrencyName = (code, selectElement) => {
-                    let name = code;
-                    if (selectElement) {
-                        const opt = Array.from(selectElement.options).find(o => o.value === code);
-                        if (opt) {
-                            const parts = opt.text.split(' - ');
-                            if (parts.length > 1) name = parts[1];
-                        }
-                    }
-                    if (name.includes('俄币')) name = '卢布';
-                    return name;
-                };
-
-                const sourceName = getCurrencyName(sourceCurrency, sourceSelect);
-                const targetName = getCurrencyName(targetCurrency, targetSelect);
-
-                // 辅助函数：生成标准读法
-                const getStandardReading = (num, cName) => {
-                    // 确保传入的是数字类型
-                    num = parseFloat(num);
-                    if (isNaN(num)) return '无法计算';
-
-                    let r = digitToChinese(num);
-                    if (r.includes('数据非法') || r.includes('金额过大')) return r;
-                    
-                    if (cName === '人民币' || cName === 'CNY') return r;
-                    
-                    // 替换单位
-                    r = r.replace(/整$/g, '');
-                    r = r.replace(/元/g, cName);
-                    return r;
-                };
-
-                sourceReadingEl.innerHTML = `<span style="color:#64748b; font-size:0.9em;">源金额 (${sourceName})：</span><br>${getStandardReading(finalSourceAmount, sourceName)}`;
-                targetReadingEl.innerHTML = `<span style="color:#64748b; font-size:0.9em;">换算后 (${targetName})：</span><br>${getStandardReading(baseResult, targetName)}`;
+        function displayResult() {
+            if (rateSource && rateTarget) {
+                const baseResult = (finalSourceAmount / rateSource) * rateTarget;
+                const finalResult = baseResult / targetMultiplier;
                 
-                // 更新实时汇率显示
-                if (rateDisplayEl) {
-                     rateDisplayEl.innerHTML = `<span style="color:#64748b">当前汇率：</span>${rateText} <span style="color:#94a3b8; font-size:0.85em; margin-left:8px;">(实时更新)</span>`;
+                // 显示结果
+                if (targetMultiplier > 1) {
+                    mainResult.textContent = new Intl.NumberFormat('zh-CN', { 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 4 
+                    }).format(finalResult);
+                } else {
+                    mainResult.textContent = formatCurrency(finalResult, targetCurrency);
                 }
-            }
+                
+                // 只有当目标单位和源单位不一样，或者有倍率时，才显示辅助信息，否则太冗余
+                let targetUnitText = '';
+                if (targetMultiplier > 1 && targetUnitSelect) {
+                    targetUnitText = targetUnitSelect.options[targetUnitSelect.selectedIndex].text;
+                }
+                subResult.textContent += ` -> ${mainResult.textContent} ${targetUnitText}${targetCurrency}`;
+                
+                // 显示汇率参考
+                const exchangeRate = rateTarget / rateSource;
+                // 为了符合用户习惯，如果数值小于1 (如 CNY->USD = 0.14)，则显示反向汇率 (1 USD = 7.x CNY)
+                let rateText = '';
+                if (exchangeRate < 1 && exchangeRate > 0) {
+                    rateText = `1 ${targetCurrency} ≈ ${(1/exchangeRate).toFixed(4)} ${sourceCurrency}`;
+                    subResult.textContent += `  (${rateText})`;
+                } else {
+                    rateText = `1 ${sourceCurrency} ≈ ${exchangeRate.toFixed(4)} ${targetCurrency}`;
+                    subResult.textContent += `  (${rateText})`;
+                }
 
-        } else {
-            subResult.textContent = '暂无该币种汇率数据';
-            // 保持框显示，但提示无数据
-             if (sourceReadingEl) sourceReadingEl.innerHTML = '<span style="color:#94a3b8">等待输入...</span>';
-             if (targetReadingEl) targetReadingEl.innerHTML = '<span style="color:#94a3b8">等待输入...</span>';
-             if (rateDisplayEl) rateDisplayEl.innerHTML = '<span style="color:#64748b">当前汇率：</span>暂无数据';
+                // 新增：显示标准读法
+                if (readingBox && sourceReadingEl && targetReadingEl) {
+                    const getCurrencyName = (code, selectElement) => {
+                        let name = code;
+                        if (selectElement) {
+                            const opt = Array.from(selectElement.options).find(o => o.value === code);
+                            if (opt) {
+                                const parts = opt.text.split(' - ');
+                                if (parts.length > 1) name = parts[1];
+                            }
+                        }
+                        if (name.includes('俄币')) name = '卢布';
+                        return name;
+                    };
+
+                    const sourceName = getCurrencyName(sourceCurrency, sourceSelect);
+                    const targetName = getCurrencyName(targetCurrency, targetSelect);
+
+                    // 辅助函数：生成标准读法
+                    const getStandardReading = (num, cName) => {
+                        // 确保传入的是数字类型
+                        num = parseFloat(num);
+                        if (isNaN(num)) return '无法计算';
+
+                        let r = digitToChinese(num);
+                        if (r.includes('数据非法') || r.includes('金额过大')) return r;
+                        
+                        if (cName === '人民币' || cName === 'CNY') return r;
+                        
+                        // 替换单位
+                        r = r.replace(/整$/g, '');
+                        r = r.replace(/元/g, cName);
+                        return r;
+                    };
+
+                    sourceReadingEl.innerHTML = `<span style="color:#64748b; font-size:0.9em;">源金额 (${sourceName})：</span><br>${getStandardReading(finalSourceAmount, sourceName)}`;
+                    targetReadingEl.innerHTML = `<span style="color:#64748b; font-size:0.9em;">换算后 (${targetName})：</span><br>${getStandardReading(baseResult, targetName)}`;
+                    
+                    // 更新实时汇率显示
+                    if (rateDisplayEl) {
+                        rateDisplayEl.innerHTML = `<span style="color:#64748b">当前汇率：</span>${rateText} <span style="color:#94a3b8; font-size:0.85em; margin-left:8px;">(实时更新)</span>`;
+                    }
+                }
+
+            } else {
+                subResult.textContent = '暂无该币种汇率数据';
+                // 保持框显示，但提示无数据
+                if (sourceReadingEl) sourceReadingEl.innerHTML = '<span style="color:#94a3b8">等待输入...</span>';
+                if (targetReadingEl) targetReadingEl.innerHTML = '<span style="color:#94a3b8">等待输入...</span>';
+                if (rateDisplayEl) rateDisplayEl.innerHTML = '<span style="color:#64748b">当前汇率：</span>暂无数据';
+            }
         }
     }
 }
@@ -481,29 +534,29 @@ function initExchangeRateTable() {
     // 初始化加载
     loadData();
 
-    async function loadData() {
+    function loadData() {
         const base = baseSelect.value;
         setLoadingState(true);
         
         // 尝试获取数据
-        const success = await fetchGlobalRates(base);
-        
-        if (success) {
-            renderTable();
-        } else {
-            // 如果获取失败
-            if (currentBase !== base) {
-                // 如果切换币种失败，回退下拉框显示
-                alert(`获取 ${base} 汇率失败，请检查网络。`);
-                baseSelect.value = currentBase;
+        fetchGlobalRates(base).then(success => {
+            if (success) {
                 renderTable();
             } else {
-                // 如果是当前币种刷新失败（可能使用了缓存或兜底），依然渲染
-                renderTable();
+                // 如果获取失败
+                if (currentBase !== base) {
+                    // 如果切换币种失败，回退下拉框显示
+                    alert(`获取 ${base} 汇率失败，请检查网络。`);
+                    baseSelect.value = currentBase;
+                    renderTable();
+                } else {
+                    // 如果是当前币种刷新失败（可能使用了缓存或兜底），依然渲染
+                    renderTable();
+                }
             }
-        }
-        
-        setLoadingState(false);
+            
+            setLoadingState(false);
+        });
     }
 
     function renderTable() {
@@ -567,9 +620,9 @@ function initExchangeRateTable() {
     // 事件监听
     if (baseSelect) baseSelect.addEventListener('change', loadData);
     
-    if (refreshBtn) refreshBtn.addEventListener('click', async () => {
+    if (refreshBtn) refreshBtn.addEventListener('click', () => {
         lastUpdateTime = null; // Force refresh
-        await loadData();
+        loadData();
     });
 }
 
@@ -655,4 +708,89 @@ function restoreHistory(item) {
         toEl.value = item.to;
         fromEl.dispatchEvent(new Event('change'));
     }
+}
+
+// ==========================================
+// 模块4：股票持仓成本计算
+// ==========================================
+function initStockCalculator() {
+    const currentSharesEl = document.getElementById('current-shares');
+    const currentCostEl = document.getElementById('current-cost');
+    const changeSharesEl = document.getElementById('change-shares');
+    const changePriceEl = document.getElementById('change-price');
+    const calculateBtn = document.getElementById('calculate-stock');
+    const finalSharesEl = document.getElementById('final-shares');
+    const finalCostEl = document.getElementById('final-cost');
+    const finalTotalEl = document.getElementById('final-total'); // 最后持仓总额显示元素
+    const finalProfitEl = document.getElementById('final-profit'); // 最终盈亏显示元素
+
+    // 计算逻辑
+    function calculateStockCost() {
+        // 获取输入值
+        const currentShares = parseFloat(currentSharesEl.value);
+        const currentCost = parseFloat(currentCostEl.value);
+        const changeShares = parseFloat(changeSharesEl.value);
+        const changePrice = parseFloat(changePriceEl.value);
+
+        // 输入验证
+        if (isNaN(currentShares) || currentShares < 0) {
+            alert('请输入有效的持仓股数');
+            return;
+        }
+
+        if (isNaN(currentCost) || currentCost < 0) {
+            alert('请输入有效的持仓成本价');
+            return;
+        }
+
+        if (isNaN(changeShares)) {
+            alert('请输入有效的增减股数');
+            return;
+        }
+
+        if (isNaN(changePrice) || changePrice < 0) {
+            alert('请输入有效的加减仓股价');
+            return;
+        }
+
+        // 计算最终持仓股数
+        const finalShares = currentShares + changeShares;
+
+        // 验证最终股数不能为负
+        if (finalShares <= 0) {
+            alert('最终持仓股数不能为0或负数');
+            return;
+        }
+
+        // 计算总成本
+        const currentTotalCost = currentShares * currentCost;
+        const changeTotalCost = changeShares * changePrice;
+        const finalTotalCost = currentTotalCost + changeTotalCost;
+
+        // 计算最终成本价（加权平均）
+        const finalCost = finalTotalCost / finalShares;
+        
+        // 计算最终盈亏：(当前市场价格 - 最终持仓成本价) × 最终持仓股数
+        // 使用加减仓股价作为当前市场价格
+        const finalProfit = (changePrice - finalCost) * finalShares;
+
+        // 显示结果
+        finalSharesEl.textContent = Math.round(finalShares).toLocaleString();
+        finalCostEl.textContent = finalCost.toFixed(2);
+        finalTotalEl.textContent = finalTotalCost.toFixed(2); // 显示最后持仓总额
+        finalProfitEl.textContent = finalProfit.toFixed(2); // 显示最终盈亏
+    }
+
+    // 添加事件监听
+    calculateBtn.addEventListener('click', calculateStockCost);
+
+    // 支持回车键计算
+    const inputElements = [currentSharesEl, currentCostEl, changeSharesEl, changePriceEl];
+    inputElements.forEach(el => {
+        el.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                calculateStockCost();
+            }
+        });
+    });
 }
